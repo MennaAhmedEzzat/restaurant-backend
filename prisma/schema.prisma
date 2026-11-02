@@ -1,0 +1,221 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum Role {
+    USER
+    STAFF
+    ADMIN
+}
+
+enum OrderStatus {
+    PENDING
+    PREPARING
+    READY
+    PICKED_UP
+    CANCELLED
+}
+
+enum SessionStatus {
+    ACTIVE
+    LOCKED
+    EXPIRED
+}
+
+enum TransactionType {
+    EARNED_GAME
+    REDEEMED_REWARD
+    ADMIN_ADJUSTMENT
+}
+
+model User {
+    id           String   @id @default(uuid())
+    phone        String   @unique
+    passwordHash String
+    fullName     String
+    role         Role     @default(USER)
+    totalPoints  Int      @default(0)
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    orders             Order[]
+    waitingSessions    WaitingSession[]
+    gameAttempts       GameAttempt[]
+    pointsTransactions PointsTransaction[]
+    rewardRedemptions  RewardRedemption[]
+    spinHistory        SpinHistory[]
+
+    @@map("users")
+}
+
+model Restaurant {
+    id        String   @id @default(uuid())
+    name      String
+    logoUrl   String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    branches Branch[]
+
+    @@map("restaurants")
+}
+
+model Branch {
+    id            String   @id @default(uuid())
+    restaurantId  String
+    name          String
+    address       String
+    latitude      Float
+    longitude     Float
+    radiusKm      Float    @default(3.0)
+    allowedRadius Int      @default(150)
+    qrToken       String   @unique @default(uuid())
+    isActive      Boolean  @default(true)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    restaurant      Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+    orders          Order[]
+    waitingSessions WaitingSession[]
+
+    @@map("branches")
+}
+
+model Order {
+    id          String      @id @default(uuid())
+    orderNumber String?
+    totalPrice  Float?
+    branchId    String
+    userId      String?
+    status      OrderStatus @default(PREPARING)
+    createdAt   DateTime    @default(now())
+    updatedAt   DateTime    @updatedAt
+
+    branch         Branch          @relation(fields: [branchId], references: [id])
+    user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+    waitingSession WaitingSession?
+
+    @@map("orders")
+}
+
+model WaitingSession {
+    id        String        @id @default(uuid())
+    userId    String
+    branchId  String
+    orderId   String        @unique
+    status    SessionStatus @default(ACTIVE)
+    startedAt DateTime      @default(now())
+    endedAt   DateTime?
+
+    user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    branch       Branch        @relation(fields: [branchId], references: [id])
+    order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    gameAttempts GameAttempt[]
+
+    @@map("waiting_sessions")
+}
+
+model Game {
+    id          String   @id @default(uuid())
+    code        String   @unique
+    title       String
+    description String
+    difficulty  String   @default("MEDIUM")
+    maxPoints   Int      @default(50)
+    cooldownSec Int      @default(30)
+    isActive    Boolean  @default(true)
+    createdAt   DateTime @default(now())
+
+    gameAttempts GameAttempt[]
+
+    @@map("games")
+}
+
+model GameAttempt {
+    id           String    @id @default(uuid())
+    sessionId    String
+    userId       String
+    gameId       String
+    score        Int       @default(0)
+    earnedPoints Int       @default(0)
+    isVerified   Boolean   @default(false)
+    startedAt    DateTime  @default(now())
+    completedAt  DateTime?
+
+    session WaitingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+    game    Game           @relation(fields: [gameId], references: [id])
+
+    @@map("game_attempts")
+}
+
+model PointsTransaction {
+    id          String          @id @default(uuid())
+    userId      String
+    points      Int
+    type        TransactionType
+    description String
+    createdAt   DateTime        @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, createdAt(sort: Desc)])
+    @@map("points_transactions")
+}
+
+model Reward {
+    id             String   @id @default(uuid())
+    title          String
+    description    String?
+    pointsRequired Int?
+    discountCode   String?
+    discountPct    Float    @default(0)
+    imageUrl       String?
+    isActive       Boolean  @default(true)
+    createdAt      DateTime @default(now())
+
+    redemptions RewardRedemption[]
+
+    @@map("rewards")
+}
+
+model RewardRedemption {
+    id         String   @id @default(uuid())
+    userId     String
+    rewardId   String
+    redeemedAt DateTime @default(now())
+
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    reward Reward @relation(fields: [rewardId], references: [id])
+
+    @@map("reward_redemptions")
+}
+
+model SpinHistory {
+    id        String   @id @default(uuid())
+    userId    String
+    reward    String
+    createdAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@map("spin_history")
+}
+
+model Settings {
+    id               String   @id @default("default")
+    nameAr           String   @default("بَلبَن")
+    nameEn           String   @default("B.LABAN")
+    logoUrl          String   @default("/logo.png")
+    primaryColor     String   @default("#e11d48")
+    secondaryColor   String   @default("#f43f5e")
+    welcomeMessageAr String   @default("أهلاً بك في عالم الحلوى والجوائز!")
+    welcomeMessageEn String   @default("Welcome to the world of desserts & rewards!")
+    gameSettingsJson String   @default("[]")
+    updatedAt        DateTime @updatedAt
+}
