@@ -11,6 +11,7 @@ module.exports = {
   resolve: {
     extensions: ['.ts', '.js', '.json'],
   },
+  // تم إزالة أي إعدادات خاصة بـ externals لضمان دمج جميع حزم NestJS بالداخل
   module: {
     rules: [
       {
