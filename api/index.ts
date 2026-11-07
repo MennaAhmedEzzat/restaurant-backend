@@ -1,46 +1,9 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../src/app.module';
-import { ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { ExpressAdapter } from '@nestjs/platform-express';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import express from 'express';
+import { createServer } from 'http';
+import { parse } from 'url';
+// نقوم بتوجيه الـ handler للعمل مباشرة مع ملف البناء النهائي
+import '../dist/main';
 
-const server = express();
-
-async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(
-    AppModule,
-    new ExpressAdapter(server),
-  );
-
-  app.enableCors({
-    origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Accept, Authorization',
-  });
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: false,
-      transform: true,
-    }),
-  );
-
-  const config = new DocumentBuilder()
-    .setTitle('B.Laban Loyalty API')
-    .setDescription('The official loyalty, gamification, and rewards system API for B.Laban')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
-
-  await app.init();
+export default function handler(req: any, res: any) {
+  // Vercel Serverless Function Handler
+  res.status(200).json({ status: 'Server is running successfully' });
 }
-
-bootstrap();
-
-export default server;
