@@ -2,22 +2,30 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import express from 'express';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+const server = express();
 
-  // 1. السماح الشامل للفرونت إند من أي منفذ (3001 أو غيره) لتجنب أخطاء Preflight/CORS
+export async function createNestServer(expressInstance: express.Express) {
+  const app = await NestFactory.create<NestExpressApplication>(
+    AppModule,
+    new ExpressAdapter(expressInstance),
+  );
+
+  // 1. السماح الشامل للفرونت إند من أي منفذ
   app.enableCors({
     origin: '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
-  // 2. تفعيل الفلترة مع إيقاف منع الحقول غير المعرفة لتجنب رفض طلب الاستبدال
+  // 2. تفعيل الفلترة
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: false, // تم تغييرها لـ false حتى لا يرفض الطلب عند التمرير
+      forbidNonWhitelisted: false,
       transform: true,
     }),
   );
@@ -33,6 +41,16 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(3000);
+  await app.init();
+  return app;
 }
-bootstrap();
+
+// تشغيل محلي إذا لم يتم تشغيله على Vercel
+if (process.env.NODE_ENV !== 'production') {
+  createNestServer(server).then(async (app) => {
+    await app.listen(3000);
+    console.log('Server is running on http://localhost:3000');
+  });
+}
+
+export default server;
